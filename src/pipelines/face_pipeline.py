@@ -24,14 +24,31 @@ def load_dlib_models():
     return detector,sp,facerec
 
 def get_face_embeddings(image_np):
-    detector,sp,facerec = load_dlib_models()
-    faces = detector(image_np, 1)
+    detector, sp, facerec = load_dlib_models()
 
-    encodings= [1]
+    # Remove alpha channel if image has one
+    if image_np.ndim == 3 and image_np.shape[2] == 4:
+        image_np = image_np[:, :, :3]
+
+    # Make image compatible with dlib
+    image_np = np.ascontiguousarray(image_np, dtype=np.uint8)
+
+    # Detect faces
+    faces = detector(image_np, 2)
+
+    # Show number of detected faces for testing
+    st.write("Faces detected by dlib:", len(faces))
+
+    encodings = []
 
     for face in faces:
-        shape = sp(image_np,face)
-        face_descriptor = facerec.compute_face_descriptor(image_np,shape, 1) #128 embedding
+        shape = sp(image_np, face)
+
+        face_descriptor = facerec.compute_face_descriptor(
+            image_np,
+            shape,
+            1
+        )
 
         encodings.append(np.array(face_descriptor))
 
@@ -56,7 +73,7 @@ def get_trained_model():
     if len(X) ==0:
         return 0
 
-    clf = SVC(kernal='linear',probablity=True,clss_weight='balanced')
+    clf = SVC(kernel='linear', probability=True, class_weight='balanced')
 
     try:
         clf.fit(X,Y)
@@ -71,15 +88,15 @@ def train_classifier():
     model_data = get_trained_model()
     return bool(model_data)
 
-def predict_attandance(class_image_np):
+def predict_attendance(class_image_np):
     encodings = get_face_embeddings(class_image_np)
 
     detected_student ={}
 
-    model_data = get_trained_model
+    model_data = get_trained_model()
 
     if not model_data:
-        return {},[],0 ## detected_student,[],len(encodings)
+        return {},[],len(encodings) ## detected_student,[],len(encodings)
 
     clf = model_data['clf']
     X_train = model_data['X']
@@ -104,4 +121,4 @@ def predict_attandance(class_image_np):
         if best_match_score <= resemblance_threshold:
             detected_student[predicted_id] = True
 
-    return detected_student,all_students, len(encoding)
+    return detected_student,all_students, len(encodings)
